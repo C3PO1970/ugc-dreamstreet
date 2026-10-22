@@ -47,11 +47,11 @@ export async function GET(request: Request) {
             name: 'My Workspace',
           })
 
-          // Redirect to artist setup
-          return NextResponse.redirect(`${origin}/app/artist?setup=true`)
+          // Redirect to creator profile setup (legacy /app/artist still works)
+          return NextResponse.redirect(`${origin}/app/profile?setup=true`)
         }
 
-        // Check if artist profile exists
+        // Check if creator profile exists (table: artist_profiles)
         const { data: workspace2 } = await supabase
           .from('workspaces')
           .select('id')
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
             .single()
 
           if (!profile) {
-            return NextResponse.redirect(`${origin}/app/artist?setup=true`)
+            return NextResponse.redirect(`${origin}/app/profile?setup=true`)
           }
         }
       }

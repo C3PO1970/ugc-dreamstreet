@@ -2,8 +2,9 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'UGC DreamStreet - Content Planning for Music Creators',
-  description: 'Generate and organize UGC content for your music. Plan posts, get AI-generated captions, and grow your audience.',
+  title: 'DreamStreet — AI-Powered Creator Platform',
+  description:
+    'Your AI-powered workspace to create content, write captions, plan posts, and grow your audience — for creators, influencers, brands, and businesses.',
 }
 
 export default function RootLayout({

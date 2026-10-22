@@ -4,11 +4,24 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
 
-const navItems = [
+const navItems: {
+  href: string
+  label: string
+  icon: string
+  matchPrefix?: boolean
+  /** Extra paths that should highlight this nav item (e.g. legacy routes). */
+  alsoActiveFor?: string[]
+}[] = [
   { href: '/app/dashboard', label: 'Dashboard', icon: '📊' },
   { href: '/app/plan', label: 'Content Plan', icon: '📅' },
   { href: '/app/library', label: 'Library', icon: '📚' },
-  { href: '/app/artist', label: 'Artist Profile', icon: '🎤' },
+  { href: '/app/clips', label: 'ClipSlot Lite', icon: '🎬', matchPrefix: true },
+  {
+    href: '/app/profile',
+    label: 'Creator Profile',
+    icon: '✨',
+    alsoActiveFor: ['/app/artist'],
+  },
 ]
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -36,7 +49,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {/* Nav Links */}
           <nav className="flex items-center gap-1">
             {navItems.map((item) => {
-              const isActive = pathname === item.href
+              const isActive = item.matchPrefix
+                ? pathname.startsWith(item.href)
+                : pathname === item.href ||
+                  (item.alsoActiveFor?.some(
+                    (p) => pathname === p || pathname.startsWith(p + '/')
+                  ) ?? false)
               return (
                 <Link
                   key={item.href}

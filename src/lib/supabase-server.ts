@@ -56,3 +56,8 @@ export async function getArtistProfile(workspaceId: string) {
     .single()
   return data
 }
+
+/** Preferred alias — same query as getArtistProfile. */
+export async function getCreatorProfile(workspaceId: string) {
+  return getArtistProfile(workspaceId)
+}

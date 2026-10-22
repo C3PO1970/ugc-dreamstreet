@@ -1,18 +1,63 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { Suspense, useEffect, useState } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import type { ArtistProfile } from '@/lib/supabase'
+import type { CreatorProfile } from '@/lib/supabase'
 
-const GENRES = [
-  'Pop', 'Hip-Hop', 'R&B', 'Rock', 'Electronic', 'Country',
-  'Jazz', 'Classical', 'Reggae', 'Latin', 'Indie', 'Metal', 'Other'
+/** Stored in artist_profiles.genre — creator industry/category (music genres preserved). */
+const CREATOR_CATEGORIES = [
+  'Influencer',
+  'UGC Creator',
+  'Video Creator',
+  'Musician / Artist',
+  'Podcaster',
+  'YouTuber',
+  'TikTok / Instagram Creator',
+  'Photographer',
+  'Educator',
+  'Coach / Educator',
+  'Entrepreneur / Small Business',
+  'Brand / Marketing',
+  // Music genres (existing users + music-focused creators)
+  'Pop',
+  'Hip-Hop',
+  'R&B',
+  'Rock',
+  'Electronic',
+  'Country',
+  'Jazz',
+  'Classical',
+  'Reggae',
+  'Latin',
+  'Indie',
+  'Metal',
+  'Other',
 ]
 
 const PLATFORMS = ['instagram', 'facebook']
 
+function ProfileLoadingFallback() {
+  return (
+    <div className="flex items-center justify-center py-20">
+      <div className="text-gray-400">Loading...</div>
+    </div>
+  )
+}
+
+/**
+ * useSearchParams requires a Suspense boundary for Next.js static generation.
+ * /app/profile re-exports this page default, so both routes are covered.
+ */
 export default function ArtistProfilePage() {
+  return (
+    <Suspense fallback={<ProfileLoadingFallback />}>
+      <ArtistProfileContent />
+    </Suspense>
+  )
+}
+
+function ArtistProfileContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const isSetup = searchParams.get('setup') === 'true'
@@ -20,7 +65,7 @@ export default function ArtistProfilePage() {
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
-  const [profile, setProfile] = useState<Partial<ArtistProfile>>({
+  const [profile, setProfile] = useState<Partial<CreatorProfile>>({
     name: '',
     genre: '',
     vibe_keywords: [],
@@ -141,49 +186,53 @@ export default function ArtistProfilePage() {
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">
-          {isSetup ? 'Set Up Your Artist Profile' : 'Artist Profile'}
+          {isSetup ? 'Set Up Your Creator Profile' : 'Creator Profile'}
         </h1>
         <p className="text-gray-400 text-sm mt-1">
           {isSetup
-            ? 'Tell us about yourself so we can create better content for you.'
-            : 'Update your profile to improve AI-generated content.'}
+            ? 'Tell us who you create for so we can personalize captions, hooks, and plans.'
+            : 'Update your profile so AI content matches your industry, audience, and voice.'}
         </p>
       </div>
 
       {/* Form */}
       <form onSubmit={handleSubmit} className="space-y-6">
-        {/* Artist Name */}
+        {/* Creator / brand name */}
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1.5">
-            Artist / Stage Name *
+            Creator / Brand Name *
           </label>
           <input
             type="text"
             value={profile.name || ''}
             onChange={(e) => setProfile({ ...profile, name: e.target.value })}
-            placeholder="e.g., DJ Nova"
+            placeholder="e.g., Nova Media, Studio Bloom, your channel or brand name"
             required
             className="w-full px-4 py-2.5 rounded-lg bg-gray-900 border border-gray-800 text-white placeholder:text-gray-500 focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none transition-colors"
           />
         </div>
 
-        {/* Genre */}
+        {/* Industry / category (stored in genre column) */}
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-1.5">
-            Primary Genre
+            Industry / Category
           </label>
           <select
             value={profile.genre || ''}
             onChange={(e) => setProfile({ ...profile, genre: e.target.value })}
             className="w-full px-4 py-2.5 rounded-lg bg-gray-900 border border-gray-800 text-white focus:border-purple-500 focus:ring-2 focus:ring-purple-500/20 outline-none transition-colors"
           >
-            <option value="">Select a genre</option>
-            {GENRES.map((genre) => (
-              <option key={genre} value={genre.toLowerCase()}>
-                {genre}
+            <option value="">Select a category</option>
+            {CREATOR_CATEGORIES.map((category) => (
+              <option key={category} value={category.toLowerCase()}>
+                {category}
               </option>
             ))}
           </select>
+          <p className="text-xs text-gray-500 mt-1">
+            Choose the option that best fits you. AI adapts captions and plans to this category
+            (including music genres when relevant).
+          </p>
         </div>
 
         {/* Vibe Keywords */}

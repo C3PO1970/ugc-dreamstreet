@@ -15,10 +15,12 @@ export interface Workspace {
   created_at: string
 }
 
+/** Maps to Supabase table `artist_profiles` (legacy name; product term: Creator Profile). */
 export interface ArtistProfile {
   id: string
   workspace_id: string
   name: string
+  /** Industry / category (column name remains `genre` for compatibility). */
   genre: string | null
   vibe_keywords: string[] | null
   brand_voice: string | null
@@ -26,6 +28,9 @@ export interface ArtistProfile {
   created_at: string
   updated_at: string
 }
+
+/** Preferred product type alias — same shape as ArtistProfile. */
+export type CreatorProfile = ArtistProfile
 
 export interface ContentLibraryItem {
   id: string

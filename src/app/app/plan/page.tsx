@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import type { ArtistProfile, ContentLibraryItem } from '@/lib/supabase'
+import type { CreatorProfile, ContentLibraryItem } from '@/lib/supabase'
 
 const DURATION_OPTIONS = [
   { value: 7, label: '7 Days', description: 'Perfect for a week of content' },
@@ -16,16 +16,24 @@ const PLATFORM_OPTIONS = [
   { value: 'facebook', label: 'Facebook', icon: '📘' },
 ]
 
+/** Map DB item_type → creator-neutral API library keys (legacy keys still accepted by API). */
+const LIBRARY_API_KEYS: Record<ContentLibraryItem['item_type'], string> = {
+  lyrics: 'keyLines',
+  song_meaning: 'coreMessage',
+  release_notes: 'launchNotes',
+  personal_story: 'brandStory',
+  audience_notes: 'audienceNotes',
+}
+
 export default function PlanPage() {
   const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [isGenerating, setIsGenerating] = useState(false)
   const [workspaceId, setWorkspaceId] = useState<string | null>(null)
-  const [artist, setArtist] = useState<ArtistProfile | null>(null)
+  const [creator, setCreator] = useState<CreatorProfile | null>(null)
   const [libraryItems, setLibraryItems] = useState<ContentLibraryItem[]>([])
   const [error, setError] = useState<string | null>(null)
 
-  // Form state
   const [duration, setDuration] = useState(7)
   const [platforms, setPlatforms] = useState<string[]>(['instagram'])
 
@@ -52,16 +60,15 @@ export default function PlanPage() {
 
     setWorkspaceId(workspace.id)
 
-    // Get artist profile
+    // Table remains artist_profiles for compatibility
     const { data: profile } = await supabase
       .from('artist_profiles')
       .select('*')
       .eq('workspace_id', workspace.id)
       .single()
 
-    setArtist(profile)
+    setCreator(profile)
 
-    // Get library items
     const { data: items } = await supabase
       .from('content_library_items')
       .select('*')
@@ -82,16 +89,16 @@ export default function PlanPage() {
   }
 
   async function handleGenerate() {
-    if (!workspaceId || !artist) return
+    if (!workspaceId || !creator) return
 
     setIsGenerating(true)
     setError(null)
 
     try {
-      // Build content library object
       const contentLibrary: Record<string, string> = {}
       libraryItems.forEach((item) => {
-        const key = item.item_type.replace('_', '')
+        const key = LIBRARY_API_KEYS[item.item_type]
+        if (!key) return
         if (!contentLibrary[key]) {
           contentLibrary[key] = item.content
         } else {
@@ -99,33 +106,50 @@ export default function PlanPage() {
         }
       })
 
-      // Call generate API
+      const industry = creator.genre || 'general'
+
       const response = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workspaceId,
-          artistName: artist.name,
-          genre: artist.genre || 'general',
-          vibeKeywords: artist.vibe_keywords || [],
-          brandVoice: artist.brand_voice || 'casual and friendly',
+          creatorName: creator.name,
+          industry,
+          category: industry,
+          // Legacy fields kept for compatibility with older clients
+          artistName: creator.name,
+          genre: industry,
+          vibeKeywords: creator.vibe_keywords || [],
+          brandVoice: creator.brand_voice || 'casual and friendly',
           platforms,
           durationDays: duration,
           contentLibrary,
         }),
       })
 
+      const data = await response.json().catch(() => ({}))
+
       if (!response.ok) {
-        const data = await response.json()
-        throw new Error(data.error || 'Failed to generate content plan')
+        throw new Error(
+          (data && data.error) || 'Failed to generate content plan'
+        )
       }
 
-      const { contentPlanId } = await response.json()
+      const postsGenerated =
+        typeof data.postsGenerated === 'number' ? data.postsGenerated : 0
 
-      // Redirect to dashboard
+      if (!data.success || postsGenerated < 1) {
+        throw new Error(
+          data.error ||
+            'Generation finished but no posts were saved. Please try again.'
+        )
+      }
+
       router.push('/app/dashboard')
-    } catch (err: any) {
-      setError(err.message || 'Something went wrong')
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Something went wrong'
+      setError(message)
       setIsGenerating(false)
     }
   }
@@ -138,16 +162,16 @@ export default function PlanPage() {
     )
   }
 
-  if (!artist) {
+  if (!creator) {
     return (
       <div className="max-w-lg mx-auto text-center py-16">
-        <div className="text-4xl mb-4">🎤</div>
-        <h2 className="text-lg font-semibold text-white mb-2">Set up your artist profile first</h2>
+        <div className="text-4xl mb-4">✨</div>
+        <h2 className="text-lg font-semibold text-white mb-2">Set up your creator profile first</h2>
         <p className="text-gray-400 text-sm mb-6">
-          We need to know about you to generate personalized content.
+          We need your industry, audience, and voice to generate personalized content.
         </p>
         <a
-          href="/app/artist?setup=true"
+          href="/app/profile?setup=true"
           className="inline-flex items-center gap-2 px-6 py-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors"
         >
           Create Profile
@@ -158,7 +182,6 @@ export default function PlanPage() {
 
   return (
     <div className="max-w-2xl mx-auto">
-      {/* Header */}
       <div className="mb-8">
         <h1 className="text-2xl font-bold text-white">Generate Content Plan</h1>
         <p className="text-gray-400 text-sm mt-1">
@@ -166,22 +189,20 @@ export default function PlanPage() {
         </p>
       </div>
 
-      {/* Artist Summary */}
       <div className="p-4 rounded-xl bg-gray-900 border border-gray-800 mb-6">
         <div className="flex items-center gap-3">
           <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-500 to-pink-500 flex items-center justify-center text-xl">
-            🎤
+            ✨
           </div>
           <div>
-            <div className="font-medium text-white">{artist.name}</div>
+            <div className="font-medium text-white">{creator.name}</div>
             <div className="text-sm text-gray-400">
-              {artist.genre} • {(artist.vibe_keywords || []).slice(0, 3).join(', ')}
+              {creator.genre} • {(creator.vibe_keywords || []).slice(0, 3).join(', ')}
             </div>
           </div>
         </div>
       </div>
 
-      {/* Library Status */}
       <div className="p-4 rounded-xl bg-gray-900 border border-gray-800 mb-6">
         <div className="flex items-center justify-between">
           <div>
@@ -199,7 +220,6 @@ export default function PlanPage() {
         </div>
       </div>
 
-      {/* Duration Selection */}
       <div className="mb-6">
         <label className="block text-sm font-medium text-gray-300 mb-3">
           Plan Duration
@@ -222,7 +242,6 @@ export default function PlanPage() {
         </div>
       </div>
 
-      {/* Platform Selection */}
       <div className="mb-8">
         <label className="block text-sm font-medium text-gray-300 mb-3">
           Platforms
@@ -248,14 +267,12 @@ export default function PlanPage() {
         </div>
       </div>
 
-      {/* Error */}
       {error && (
         <div className="mb-6 px-4 py-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
           {error}
         </div>
       )}
 
-      {/* Generate Button */}
       <button
         onClick={handleGenerate}
         disabled={isGenerating}

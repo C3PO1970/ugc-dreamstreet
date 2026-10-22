@@ -5,9 +5,10 @@ node_modules
 .next
 out
 
-# environment variables
-.env*
-.env.local
+# environment variables (keep .env.example tracked)
+.env
+.env.*
+!.env.example
 
 # logs
 *.log
@@ -15,9 +16,4 @@ out
 # OS files
 .DS_Store
 Thumbs.db
-node_modules
-.next
-.env*
-*.log
-.DS_Store
-
+*.tsbuildinfo

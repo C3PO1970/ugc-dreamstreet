@@ -1,0 +1,5 @@
+-- SUPERSEDED — Do not use this file.
+-- Final migration:
+--   supabase/migrations/final_p0_rls_subscriptions_usage_counters.sql
+-- Verification:
+--   supabase/diagnostics/final_p0_rls_verification.sql

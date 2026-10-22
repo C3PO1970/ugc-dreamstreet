@@ -9,33 +9,33 @@ type ItemType = ContentLibraryItem['item_type']
 const ITEM_TYPES: { type: ItemType; label: string; icon: string; description: string }[] = [
   {
     type: 'lyrics',
-    label: 'Lyrics',
-    icon: '🎵',
-    description: 'Song lyrics or memorable lines to feature in content',
+    label: 'Key Lines',
+    icon: '✏️',
+    description: 'Taglines, quotes, hooks, or memorable lines (musicians can paste lyrics here)',
   },
   {
     type: 'song_meaning',
-    label: 'Song Meaning',
+    label: 'Core Message',
     icon: '💭',
-    description: 'The story or meaning behind your songs',
+    description: 'The main story or message behind your content, offer, or episode',
   },
   {
     type: 'release_notes',
-    label: 'Release Notes',
+    label: 'Launch Notes',
     icon: '📢',
-    description: 'Info about upcoming or recent releases',
+    description: 'Upcoming drops, launches, episodes, products, or campaigns',
   },
   {
     type: 'personal_story',
-    label: 'Personal Story',
+    label: 'Brand Story',
     icon: '📖',
-    description: 'Your journey, inspirations, or behind-the-scenes stories',
+    description: 'Your journey, brand story, inspirations, or behind-the-scenes context',
   },
   {
     type: 'audience_notes',
     label: 'Audience Notes',
     icon: '👥',
-    description: 'Who your fans are and what they respond to',
+    description: 'Who your audience is and what they respond to',
   },
 ]
 
@@ -148,8 +148,16 @@ export default function LibraryPage() {
       <div>
         <h1 className="text-2xl font-bold text-white">Content Library</h1>
         <p className="text-gray-400 text-sm mt-1">
-          Add reusable content that the AI will use to create personalized posts.
+          Add reusable source material so AI can write posts that match your niche — influencers,
+          brands, educators, podcasters, musicians, and more.
         </p>
+      </div>
+
+      <div className="px-4 py-3 rounded-xl bg-gray-900 border border-gray-800 text-sm text-gray-400">
+        <span className="text-gray-300 font-medium">Tip: </span>
+        Use <span className="text-white">Key Lines</span> for quotes and taglines. Musicians can
+        use the same field for lyrics. Everyone can use Core Message, Launch Notes, Brand Story,
+        and Audience Notes.
       </div>
 
       {/* Add New Section */}
@@ -177,8 +185,8 @@ export default function LibraryPage() {
           <div className="text-4xl mb-4">📚</div>
           <h2 className="text-lg font-semibold text-white mb-2">Your library is empty</h2>
           <p className="text-gray-400 text-sm max-w-sm mx-auto">
-            Add lyrics, stories, and notes above. The AI will use these to create
-            authentic content for you.
+            Add key lines, core messages, launch notes, and audience context. The AI will use
+            these to create authentic content for any creator type.
           </p>
         </div>
       ) : (

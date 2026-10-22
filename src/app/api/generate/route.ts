@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createServerClient, type CookieOptions } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { generateContentPlan, type GenerationInput } from '@/lib/openai'
+import { assignScheduleDates } from '@/lib/contentPlanSchedule'
 
 export const runtime = 'edge'
 
@@ -11,24 +12,55 @@ export async function POST(request: Request) {
 
     const {
       workspaceId,
+      creatorName,
       artistName,
       genre,
+      industry,
+      category,
       vibeKeywords,
       brandVoice,
       platforms,
       durationDays,
       contentLibrary,
+      startDate,
     } = body
 
-    // Validate required fields
-    if (!workspaceId || !artistName || !platforms?.length || !durationDays) {
+    const resolvedCreatorName =
+      (typeof creatorName === 'string' && creatorName.trim()) ||
+      (typeof artistName === 'string' && artistName.trim()) ||
+      ''
+
+    const resolvedGenre =
+      (typeof genre === 'string' && genre.trim()) ||
+      (typeof industry === 'string' && industry.trim()) ||
+      (typeof category === 'string' && category.trim()) ||
+      'general'
+
+    const resolvedDuration =
+      typeof durationDays === 'number'
+        ? durationDays
+        : Number.parseInt(String(durationDays), 10)
+
+    if (
+      !workspaceId ||
+      !resolvedCreatorName ||
+      !platforms?.length ||
+      !Number.isFinite(resolvedDuration) ||
+      resolvedDuration < 1
+    ) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    // Verify OpenAI API key
+    if (![7, 14, 30].includes(resolvedDuration)) {
+      return NextResponse.json(
+        { error: 'durationDays must be 7, 14, or 30' },
+        { status: 400 }
+      )
+    }
+
     if (!process.env.OPENAI_API_KEY) {
       console.error('Missing OPENAI_API_KEY')
       return NextResponse.json(
@@ -37,7 +69,6 @@ export async function POST(request: Request) {
       )
     }
 
-    // Create Supabase client
     const cookieStore = cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -57,16 +88,13 @@ export async function POST(request: Request) {
       }
     )
 
-    // Verify user is authenticated
-    const { data: { user } } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
     if (!user) {
-      return NextResponse.json(
-        { error: 'Unauthorized' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    // Verify workspace belongs to user
     const { data: workspace } = await supabase
       .from('workspaces')
       .select('id')
@@ -81,39 +109,66 @@ export async function POST(request: Request) {
       )
     }
 
-    // Generate content plan using OpenAI
+    const lib = contentLibrary || {}
     const generationInput: GenerationInput = {
-      artistName,
-      genre: genre || 'general',
+      creatorName: resolvedCreatorName,
+      artistName: resolvedCreatorName,
+      genre: resolvedGenre,
       vibeKeywords: vibeKeywords || [],
       brandVoice: brandVoice || 'casual and friendly',
       platforms,
-      durationDays,
+      durationDays: resolvedDuration,
       contentLibrary: {
-        lyrics: contentLibrary?.lyrics,
-        songMeaning: contentLibrary?.songmeaning,
-        releaseNotes: contentLibrary?.releasenotes,
-        personalStory: contentLibrary?.personalstory,
-        audienceNotes: contentLibrary?.audiencenotes,
+        lyrics: lib.keyLines ?? lib.key_lines ?? lib.lyrics,
+        songMeaning:
+          lib.coreMessage ??
+          lib.core_message ??
+          lib.songMeaning ??
+          lib.songmeaning,
+        releaseNotes:
+          lib.launchNotes ??
+          lib.launch_notes ??
+          lib.releaseNotes ??
+          lib.releasenotes,
+        personalStory:
+          lib.brandStory ??
+          lib.brand_story ??
+          lib.personalStory ??
+          lib.personalstory,
+        audienceNotes:
+          lib.audienceNotes ?? lib.audience_notes ?? lib.audiencenotes,
       },
     }
 
     const generatedPosts = await generateContentPlan(generationInput)
 
-    // Create content plan in database
+    if (!generatedPosts.length) {
+      return NextResponse.json(
+        { error: 'Generation produced no posts' },
+        { status: 502 }
+      )
+    }
+
+    // Application owns calendar dates (UTC) — ignore any AI-invented dates
+    const scheduledPosts = assignScheduleDates(
+      generatedPosts,
+      resolvedDuration,
+      typeof startDate === 'string' ? startDate : null
+    )
+
     const { data: contentPlan, error: planError } = await supabase
       .from('content_plans')
       .insert({
         workspace_id: workspaceId,
-        name: `${durationDays}-Day Plan - ${new Date().toLocaleDateString()}`,
-        duration_days: durationDays,
+        name: `${resolvedDuration}-Day Plan - ${new Date().toLocaleDateString()}`,
+        duration_days: resolvedDuration,
         platforms,
         status: 'active',
       })
       .select()
       .single()
 
-    if (planError) {
+    if (planError || !contentPlan) {
       console.error('Error creating content plan:', planError)
       return NextResponse.json(
         { error: 'Failed to save content plan' },
@@ -121,11 +176,10 @@ export async function POST(request: Request) {
       )
     }
 
-    // Insert posts
-    const postsToInsert = generatedPosts.map((post) => ({
+    const postsToInsert = scheduledPosts.map((post) => ({
       content_plan_id: contentPlan.id,
       workspace_id: workspaceId,
-      scheduled_date: post.date,
+      scheduled_date: post.scheduled_date,
       platform: post.platform,
       content_type: post.content_type,
       objective: post.objective,
@@ -133,16 +187,16 @@ export async function POST(request: Request) {
       caption: post.caption,
       script: post.script || null,
       cta: post.cta || null,
-      status: 'scheduled',
+      status: 'scheduled' as const,
     }))
 
-    const { error: postsError } = await supabase
+    const { data: insertedPosts, error: postsError } = await supabase
       .from('posts')
       .insert(postsToInsert)
+      .select('id')
 
     if (postsError) {
       console.error('Error creating posts:', postsError)
-      // Delete the content plan if posts failed
       await supabase.from('content_plans').delete().eq('id', contentPlan.id)
       return NextResponse.json(
         { error: 'Failed to save posts' },
@@ -150,16 +204,26 @@ export async function POST(request: Request) {
       )
     }
 
+    const savedCount = insertedPosts?.length ?? 0
+    if (savedCount === 0) {
+      await supabase.from('content_plans').delete().eq('id', contentPlan.id)
+      return NextResponse.json(
+        { error: 'No posts were saved' },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json({
       success: true,
       contentPlanId: contentPlan.id,
-      postsGenerated: generatedPosts.length,
+      postsGenerated: savedCount,
+      scheduleStart: scheduledPosts[0]?.scheduled_date ?? null,
+      scheduleEnd: scheduledPosts[scheduledPosts.length - 1]?.scheduled_date ?? null,
     })
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error in /api/generate:', error)
-    return NextResponse.json(
-      { error: error.message || 'An unexpected error occurred' },
-      { status: 500 }
-    )
+    const message =
+      error instanceof Error ? error.message : 'An unexpected error occurred'
+    return NextResponse.json({ error: message }, { status: 500 })
   }
 }

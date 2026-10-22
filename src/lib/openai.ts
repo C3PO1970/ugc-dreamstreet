@@ -1,22 +1,23 @@
 import OpenAI from 'openai'
+import {
+  validateGeneratedPosts,
+  type RawGeneratedPost,
+} from '@/lib/contentPlanValidation'
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-})
-
-export interface GeneratedPost {
-  date: string
-  platform: 'instagram' | 'facebook'
-  content_type: 'reel' | 'story' | 'feed'
-  objective: 'promo' | 'viral' | 'bts' | 'education' | 'community'
-  hook: string
-  caption: string
-  script: string
-  cta: string
+function getOpenAI() {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY,
+  })
 }
 
+export type { RawGeneratedPost }
+
 export interface GenerationInput {
+  /** Preferred creator / brand name. */
+  creatorName?: string
+  /** Legacy alias for creatorName — still supported. */
   artistName: string
+  /** Industry / category (legacy column name: genre). */
   genre: string
   vibeKeywords: string[]
   brandVoice: string
@@ -31,43 +32,58 @@ export interface GenerationInput {
   }
 }
 
-export async function generateContentPlan(input: GenerationInput): Promise<GeneratedPost[]> {
-  const systemPrompt = `You are an expert social media content strategist for music artists.
-Your job is to create a content plan that helps artists grow their audience and promote their music.
+/**
+ * Ask the model for post *content* only.
+ * Publishing dates are assigned by the application (see contentPlanSchedule.ts).
+ */
+export async function generateContentPlan(
+  input: GenerationInput
+): Promise<RawGeneratedPost[]> {
+  const creatorLabel =
+    (input.creatorName && input.creatorName.trim()) || input.artistName
 
-IMPORTANT: Return ONLY valid JSON. No markdown, no explanations, just the JSON array.
+  const systemPrompt = `You are an expert social media content strategist for creators of all kinds — influencers, UGC creators, video creators, musicians, podcasters, YouTubers, photographers, coaches, educators, entrepreneurs, small businesses, brands, and marketing professionals.
 
-The JSON must be an array of posts, each with these exact fields:
-- date: ISO date string (starting from tomorrow)
-- platform: "instagram" or "facebook"
+Your job is to create post concepts that help the creator grow their audience and achieve their goals. Adapt tone, topics, and CTAs to their industry/category, audience, platforms, and brand voice. When the category is music-related, it is appropriate to include releases, lyrics, and fan engagement. For other categories, prioritize relevant formats (sponsored content, product promos, episode promos, educational posts, brand deliverables, visual portfolios, etc.).
+
+CRITICAL SCHEDULING RULE:
+- Do NOT invent calendar dates, years, or publishing schedules.
+- Do NOT include a "date" or "scheduled_date" field.
+- The application assigns publishing dates separately.
+
+Return a single JSON object with this exact shape:
+{ "posts": [ ... ] }
+
+Each post object must include ONLY these fields:
+- platform: "instagram" or "facebook" (must be one of the platforms provided by the user)
 - content_type: "reel" | "story" | "feed"
 - objective: "promo" | "viral" | "bts" | "education" | "community"
 - hook: A compelling first line to grab attention (max 10 words)
 - caption: Full caption with emojis and hashtags (100-200 words)
-- script: Script for video content if applicable (50-100 words)
+- script: Script for video content if applicable (50-100 words), or empty string
 - cta: Call to action (max 20 words)
 
-Mix content types and objectives for variety. Make content feel authentic to the artist's voice.`
+Mix content types and objectives for variety. Make content feel authentic to the creator's voice.`
 
-  const userPrompt = `Create a ${input.durationDays}-day content plan for:
+  const userPrompt = `Create about ${input.durationDays} social posts (approximately one concept per day of a ${input.durationDays}-day plan) for:
 
-Artist: ${input.artistName}
-Genre: ${input.genre}
+Creator / Brand: ${creatorLabel}
+Industry / Category: ${input.genre}
 Vibe: ${input.vibeKeywords.join(', ')}
 Brand Voice: ${input.brandVoice}
-Platforms: ${input.platforms.join(', ')}
+Platforms (use ONLY these): ${input.platforms.join(', ')}
 
-Content Library:
-${input.contentLibrary.lyrics ? `Lyrics: ${input.contentLibrary.lyrics}` : ''}
-${input.contentLibrary.songMeaning ? `Song Meaning: ${input.contentLibrary.songMeaning}` : ''}
-${input.contentLibrary.releaseNotes ? `Release Notes: ${input.contentLibrary.releaseNotes}` : ''}
-${input.contentLibrary.personalStory ? `Personal Story: ${input.contentLibrary.personalStory}` : ''}
-${input.contentLibrary.audienceNotes ? `Audience Notes: ${input.contentLibrary.audienceNotes}` : ''}
+Content Library (use what is provided; ignore empty sections):
+${input.contentLibrary.lyrics ? `Key lines / lyrics / quotes: ${input.contentLibrary.lyrics}` : ''}
+${input.contentLibrary.songMeaning ? `Core message / story / meaning: ${input.contentLibrary.songMeaning}` : ''}
+${input.contentLibrary.releaseNotes ? `Release / launch / offer notes: ${input.contentLibrary.releaseNotes}` : ''}
+${input.contentLibrary.personalStory ? `Personal or brand story: ${input.contentLibrary.personalStory}` : ''}
+${input.contentLibrary.audienceNotes ? `Audience notes: ${input.contentLibrary.audienceNotes}` : ''}
 
-Generate ${input.durationDays} posts total, distributed across the selected platforms.
-Return ONLY the JSON array.`
+Return JSON as { "posts": [ ... ] } with roughly ${input.durationDays} posts. Do not include dates.`
 
-  async function tryGenerate(): Promise<GeneratedPost[]> {
+  async function tryGenerate(): Promise<RawGeneratedPost[]> {
+    const openai = getOpenAI()
     const completion = await openai.chat.completions.create({
       model: 'gpt-4o-mini',
       messages: [
@@ -83,19 +99,19 @@ Return ONLY the JSON array.`
       throw new Error('No content returned from OpenAI')
     }
 
-    const parsed = JSON.parse(content)
-    
-    // Handle both { posts: [...] } and direct array formats
-    const posts = Array.isArray(parsed) ? parsed : parsed.posts
-    
-    if (!Array.isArray(posts)) {
-      throw new Error('Invalid response format: expected array of posts')
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(content)
+    } catch {
+      throw new Error('AI returned invalid JSON')
     }
 
-    return posts as GeneratedPost[]
+    return validateGeneratedPosts(parsed, {
+      durationDays: input.durationDays,
+      allowedPlatforms: input.platforms,
+    })
   }
 
-  // Try once, retry on failure
   try {
     return await tryGenerate()
   } catch (error) {
