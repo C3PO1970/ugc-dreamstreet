@@ -1,16 +1,21 @@
 'use client'
 
-import { WIZARD_STEP_LABELS, WIZARD_TOTAL_STEPS, type WizardStepId } from '@/lib/identity/types'
+import {
+  MAX_IMPLEMENTED_STEP,
+  WIZARD_STEP_LABELS,
+  WIZARD_TOTAL_STEPS,
+  type WizardStepId,
+} from '@/lib/identity/types'
 
 interface WizardProgressProps {
   currentStep: WizardStepId
-  /** Highest step unlocked in M0 (2). Later steps show as upcoming. */
+  /** Highest step with a full UI. Steps beyond show as upcoming. */
   maxImplementedStep?: WizardStepId
 }
 
 export function WizardProgress({
   currentStep,
-  maxImplementedStep = 2,
+  maxImplementedStep = MAX_IMPLEMENTED_STEP,
 }: WizardProgressProps) {
   const steps = Array.from({ length: WIZARD_TOTAL_STEPS }, (_, i) => (i + 1) as WizardStepId)
 

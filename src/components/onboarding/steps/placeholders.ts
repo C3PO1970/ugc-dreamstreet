@@ -1,16 +1,11 @@
 /**
- * Reserved step modules for M1–M5 (not implemented in M0).
- * Keeps import paths stable for future:
- * - StepBrandPersonality
- * - StepAudienceIdentity
- * - StepGoals
- * - StepCreativeDirection
- * - StepBrandBlueprint
+ * Reserved step modules for later milestones (not implemented in Task 2B):
+ * - StepTargetAudience (5)
+ * - StepProductsGoals (6)
+ * - StepBrandReview / Activate (7)
  */
 export const FUTURE_ONBOARDING_STEPS = [
-  'personality',
-  'audience',
-  'goals',
-  'creative',
-  'blueprint',
+  'target_audience',
+  'products_goals',
+  'review_activate',
 ] as const

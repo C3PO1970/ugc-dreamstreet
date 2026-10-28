@@ -25,6 +25,10 @@ export interface ArtistProfile {
   vibe_keywords: string[] | null
   brand_voice: string | null
   platforms: string[] | null
+  /** Brand Identity Wizard blueprint (Task 2E-1). Requires migration. */
+  brand_identity?: unknown | null
+  wizard_step?: number | null
+  wizard_completed_at?: string | null
   created_at: string
   updated_at: string
 }

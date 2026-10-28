@@ -31,9 +31,4 @@ export function StepIndustryNiche({ value, onChange }: StepIndustryNicheProps) {
   )
 }
 
-export function validateIndustryNiche(value: IndustryNicheDraft): string | null {
-  if (value.selections.length === 0 && value.customNiches.length === 0) {
-    return 'Select at least one industry, niche, or custom niche.'
-  }
-  return null
-}
+export { validateIndustryNiche } from '@/lib/identity/stepValidation'

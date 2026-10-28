@@ -144,12 +144,4 @@ export function StepCreatorIdentity({ value, onChange }: StepCreatorIdentityProp
   )
 }
 
-export function validateCreatorIdentity(value: CreatorIdentityDraft): string | null {
-  if (!value.entityType) return 'Select Individual or Organization.'
-  if (!value.displayName.trim()) return 'Enter a display name.'
-  if (!value.primaryKind) return 'Select a primary identity.'
-  if (value.primaryKind === 'other' && !value.otherKindLabel.trim()) {
-    return 'Describe your identity for “Other”.'
-  }
-  return null
-}
+export { validateCreatorIdentity } from '@/lib/identity/stepValidation'

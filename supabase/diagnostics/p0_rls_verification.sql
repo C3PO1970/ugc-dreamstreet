@@ -75,7 +75,7 @@ ORDER BY table_name, grantee, privilege_type;
 -- C) Optional transactional smoke test (ROLLBACK — no lasting data)
 -- Requires: you supply valid workspace_a_id that exists.
 -- ---------------------------------------------------------------------------
-
+2
 BEGIN;
 
 -- Example disposable inserts (service/postgres role). Adjust column values.

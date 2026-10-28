@@ -1,5 +1,5 @@
 import type { BrandIdentityDraft } from './types'
-import { createEmptyDraft } from './types'
+import { createEmptyDraft, normalizeBrandIdentityDraft } from './types'
 
 const STORAGE_KEY = 'dreamstreet.brandIdentity.draft.v1'
 
@@ -8,24 +8,25 @@ export function loadIdentityDraft(): BrandIdentityDraft | null {
   try {
     const raw = window.localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-    const parsed = JSON.parse(raw) as BrandIdentityDraft
-    if (!parsed || parsed.version !== 1) return null
-    return parsed
+    const parsed = JSON.parse(raw) as unknown
+    return normalizeBrandIdentityDraft(parsed)
   } catch {
     return null
   }
 }
 
-export function saveIdentityDraft(draft: BrandIdentityDraft): void {
-  if (typeof window === 'undefined') return
+export function saveIdentityDraft(draft: BrandIdentityDraft): boolean {
+  if (typeof window === 'undefined') return false
   try {
     const payload: BrandIdentityDraft = {
-      ...draft,
+      ...normalizeBrandIdentityDraft(draft),
+      version: 2,
       updatedAt: new Date().toISOString(),
     }
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
+    return true
   } catch {
-    // Quota or private mode — ignore; in-memory state still works
+    return false
   }
 }
 
